@@ -16,12 +16,14 @@ from collections import deque
 from utils import CvFpsCalc
 from model import KeyPointClassifier
 from model import PointHistoryClassifier
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LinearRegression
-
 import mediapipe as mp
+import sys
+import joblib
 
 customtkinter.set_appearance_mode("light")
+
+
 
 class App(customtkinter.CTk):
     width = 1400
@@ -30,12 +32,12 @@ class App(customtkinter.CTk):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.title("Sign Language App")
+        self.title("SignLingu - Filipino Sign Language Translator")
         self.geometry(f"{self.width}x{self.height}")
         self.resizable(False, False)  
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)         
-        
+        self.rf_model = joblib.load('rf_model.joblib')
         args = self.get_args()
 
         self.cap_device = args.device
@@ -77,10 +79,6 @@ class App(customtkinter.CTk):
 
         # Load the dataset
         self.X, self.y = self.load_dataset('model/keypoint_classifier/keypoint.csv')
-
-        # Train Random Forest classifier using the preprocessed data and nearest classes
-        self.rf_classifier = RandomForestClassifier(n_estimators=100)
-        self.rf_classifier.fit(self.X, self.y)
 
         # FPS Measurement ########################################################
         self.cvFpsCalc = CvFpsCalc(buffer_len=10)
@@ -624,7 +622,6 @@ class App(customtkinter.CTk):
             self.prediction_entry.insert("end", predicted_letter)
 
     def update_camera(self):
-        # Your existing update_camera code here
         mode = 0
         # FPS Measurement
         fps = self.cvFpsCalc.get()
@@ -718,11 +715,11 @@ class App(customtkinter.CTk):
                         nearest_data_points.append(self.X[self.y == cls_label][0]) 
 
                     # Use the trained Random Forest classifier to predict the class
-                    predicted_class = self.rf_classifier.predict(nearest_data_points)
+                    predicted_class = self.rf_model.predict(nearest_data_points)
                     self.predicted_class_index = predicted_class[0]  # Index of the predicted class
-                    probabilities = self.rf_classifier.predict_proba(nearest_data_points)
+                    probabilities = self.rf_model.predict_proba(nearest_data_points)
                     predicted_class_probability = probabilities[0][self.predicted_class_index]  # Probability of the predicted class
-                    print("Probabilities of the 8 nearest classes:")
+                    print("Probabilities of the 5 nearest classes:")
                     for i, cls in enumerate(nearest_classes):
                         print(f"{cls}: {probabilities[0][i]}")
                     print("Random Forest predicted class:", self.keypoint_classifier_labels[self.predicted_class_index])
@@ -775,7 +772,7 @@ class App(customtkinter.CTk):
             distance = np.linalg.norm(data_point - x)  # Euclidean distance
             distances.append((distance, y[i]))
         distances.sort(key=lambda x: x[0])  # Sort by distance
-        nearest_classes = [chr(ord('A') + cls) for _, cls in distances[:8]]
+        nearest_classes = [chr(ord('A') + cls) for _, cls in distances[:5]]
         return nearest_classes
     
     def get_args(self):
